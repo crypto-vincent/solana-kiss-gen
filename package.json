@@ -1,0 +1,18 @@
+{
+  "name": "solana-kiss-gen",
+  "version": "0.0.1",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "devDependencies": {
+    "prettier": "^3.5.3",
+    "prettier-plugin-organize-imports": "^4.3.0",
+    "tsup": "^8.5.0"
+  },
+  "dependencies": {
+    "solana-kiss": "0.2.10"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --dts --clean --minify --sourcemap --out-dir dist",
+    "fmt": "prettier --write src"
+  }
+}
