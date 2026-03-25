@@ -34,13 +34,18 @@ const idlFilePathCommand = command(
           label: "IDL_FILE_PATH",
           type: typeString,
         }),
+        positionalRequired({
+          description: "Program address",
+          label: "PROGRAM_ADDRESS",
+          type: typePubkey,
+        }),
       ],
     },
-    async (_, { positionals: [idlFilePath] }) => {
+    async (_, { positionals: [idlFilePath, programAddress] }) => {
       const programIdl = idlProgramParse(
         jsonParse(await fsp.readFile(idlFilePath, "utf8")),
       );
-      console.log(makeIdlModule(programIdl));
+      console.log(makeIdlModule(programAddress, programIdl));
     },
   ),
 );
@@ -69,7 +74,8 @@ const programAddressCommand = command(
     async (_, { options: { rpcUrl }, positionals: [programAddress] }) => {
       const solana = new Solana(rpcUrl);
       const { programIdl } = await solana.getOrLoadProgramIdl(programAddress);
-      console.log(makeIdlModule(programIdl));
+      programIdl.metadata.address = programAddress;
+      console.log(makeIdlModule(programAddress, programIdl));
     },
   ),
 );

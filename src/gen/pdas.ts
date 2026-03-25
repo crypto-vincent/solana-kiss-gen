@@ -63,7 +63,7 @@ export function genPdas(
   lines.push(makePda);
 }
 
-const symbolPdasInputs = "pdasInputsJsonCodec";
+const symbolPdasInputs = "pdasInputsJsonCodecs";
 
 const pdaBlobVisitor = {
   const: () => {},

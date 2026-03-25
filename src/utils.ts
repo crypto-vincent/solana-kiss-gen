@@ -72,3 +72,11 @@ export function utilToCallString(
 export function utilCodeMinify(code: string): string {
   return code.replace(/\n/g, "").replace(/\s{2,}/g, "");
 }
+
+export function utilReplaceAll(
+  str: string,
+  searchValue: string,
+  replaceValue: string,
+): string {
+  return str.split(searchValue).join(replaceValue);
+}

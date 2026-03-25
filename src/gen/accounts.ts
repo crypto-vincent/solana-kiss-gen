@@ -52,7 +52,7 @@ export function genAccounts(
   lines.push(makeFunction);
 }
 
-const symbolAccounts = "accountsJsonCodec";
+const symbolAccounts = "accountsJsonCodecs";
 
 const makeFunction = utilCodeMinify(`
 function makeAccountObject<State>(

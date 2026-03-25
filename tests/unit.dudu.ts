@@ -7,56 +7,47 @@ import {
   signerGenerate,
   Solana,
 } from "solana-kiss";
-import * as Program_11111111111111111111111111111111 from "./fixtures/11111111111111111111111111111111";
-import * as Program_ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL from "./fixtures/ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
-import * as Program_TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA from "./fixtures/TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+import * as programSystem from "./fixtures/11111111111111111111111111111111";
+import * as programAta from "./fixtures/ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
+import * as programToken from "./fixtures/TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
 it("run", async () => {
-  const dudu =
-    Program_ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL.pdas.ata.find(
-      {
-        owner: pubkeyFromBase58("11111111111111111111111111111111"),
-        tokenProgram: pubkeyFromBase58("11111111111111111111111111111111"),
-        mint: pubkeyFromBase58("11111111111111111111111111111111"),
-      },
-      pubkeyFromBase58("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"),
-    );
+  const dudu = programAta.pdas.ata.find({
+    owner: pubkeyFromBase58("5UwX1EZUtFDo6wmwqQGxwYprQmraAxMEAwTocu5W5Ve8"),
+    tokenProgram: programToken.metadata.address,
+    mint: pubkeyFromBase58("76wX8tHAzuqucfwNfgzxugumab6cwPL5ZGdHWi8vhL8s"),
+  });
+  expect(dudu).toBe("G1hZxxBdb9sM1eQMVZCpe81PFvH4SyFK83Ue3wNrMUzr");
 
   const solana = new Solana("devnet");
-  const mintSigner = await signerGenerate();
   const payerSigner = await signerFromSecret(payerSecret);
+  const mintSigner = await signerGenerate();
 
-  const dodo =
-    Program_11111111111111111111111111111111.instructions.create.encode(
-      { payer: payerSigner.address, created: mintSigner.address },
-      {
-        lamports: lamportsRentExemptionMinimumForSpace(1000),
-        space: 1000n,
-        owner:
-          Program_TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA.metadata.address,
-      },
-    );
-  console.log(dodo);
-  const dada =
-    await Program_TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA.instructions.initializeMint.hydrateAndEncode(
-      solana,
-      { mint: mintSigner.address },
-      {
-        decimals: 6,
-        mintAuthority: payerSigner.address,
-        freezeAuthority: null,
-      },
-    );
-  console.log(dada);
+  const dodo = programSystem.instructions.create.encode(
+    { payer: payerSigner.address, created: mintSigner.address },
+    {
+      lamports: lamportsRentExemptionMinimumForSpace(82),
+      space: 82n,
+      owner: programToken.metadata.address,
+    },
+  );
+  const dada = await programToken.instructions.initializeMint.hydrateAndEncode(
+    solana,
+    { mint: mintSigner.address },
+    {
+      decimals: 6,
+      mintAuthority: payerSigner.address,
+      freezeAuthority: payerSigner.address,
+    },
+  );
+  expect(dada.instructionRequest.instructionData.length).toStrictEqual(67);
+
   const results = await solana.prepareAndExecuteTransaction(
     payerSigner,
-    [dodo.instructionRequest],
-    { extraSigners: [mintSigner] },
+    [dodo.instructionRequest, dada.instructionRequest],
+    { extraSigners: [mintSigner], skipPreflight: true },
   );
-  console.log(results);
-
-  expect(dada.instructionRequest).toEqual({});
-  expect(dudu).toBe("2ZtLh7n1mLh3j8sH9iYpXoVqLZy5c6eHjv1uX9zQG8a");
+  expect(results.executionReport.transactionError).toStrictEqual(null);
 });
 
 const payerSecret = new Uint8Array([

@@ -100,9 +100,11 @@ export function genInstructions(
   dependencies.add("JsonCodec");
   dependencies.add("InstructionRequest");
   dependencies.add("IdlInstructionAddresses");
+  dependencies.add("IdlInstructionBlobAccountContent");
   dependencies.add("idlInstructionAccountsEncode");
   dependencies.add("idlInstructionArgsEncode");
   dependencies.add("idlInstructionReturnDecode");
+  dependencies.add("idlInstructionAccountsFind");
   lines.push("");
   lines.push(utilFunctionInstruction);
 }
@@ -122,29 +124,51 @@ function makeInstructionObject<AddressesAsync, AddressesSync, AddressesFull, Pay
       solana: Solana,
       instructionAddresses: AddressesAsync,
       instructionPayload: Payload,
-      programAddress?: Pubkey,
     ): Promise<{
       instructionRequest: InstructionRequest;
       instructionAddresses: AddressesFull;
     }> {
-      const { instructionAddresses: hydratedInstructionAddresses } = await solana.hydrateInstructionAddresses(programAddress ?? metadata.address!, instructionName, {
-        instructionAddresses: instructionAddresses as IdlInstructionAddresses,
-        instructionPayload: payloadJsonCodec.encoder(instructionPayload),
-      });
-      const { instructionRequest } = await solana.hydrateAndEncodeInstruction(
-        programAddress ?? metadata.address!,
-        instructionName,
-        {
+      const encodedPayload = payloadJsonCodec.encoder(instructionPayload);
+      const accountsCache = new Map<Pubkey, IdlInstructionBlobAccountContent>();
+      const { instructionAddresses: hydratedInstructionAddresses } =
+        await idlInstructionAccountsFind(idlInstruction, metadata.address, {
           instructionAddresses: instructionAddresses as IdlInstructionAddresses,
-          instructionPayload: payloadJsonCodec.encoder(instructionPayload),
-        },
+          instructionPayload: encodedPayload,
+          accountFetcher: async (accountAddress: Pubkey) => {
+            const accountCached = accountsCache.get(accountAddress);
+            if (accountCached) {
+              return accountCached;
+            }
+            const { accountIdl, accountState } =
+              await solana.getAndInferAndDecodeAccount(accountAddress);
+            const accountContent = {
+              accountState,
+              accountTypeFull: accountIdl.typeFull,
+            };
+            accountsCache.set(accountAddress, accountContent);
+            return accountContent;
+          },
+        });
+      const { instructionInputs } = idlInstructionAccountsEncode(
+        idlInstruction,
+        hydratedInstructionAddresses,
       );
-      return { instructionRequest, instructionAddresses: hydratedInstructionAddresses as AddressesFull };
+      const { instructionData } = idlInstructionArgsEncode(
+        idlInstruction,
+        encodedPayload,
+      );
+      return {
+        instructionRequest: {
+          programAddress: metadata.address,
+          instructionInputs,
+          instructionData,
+        },
+        instructionAddresses: hydratedInstructionAddresses as AddressesFull,
+      };
     },
     encode(
       instructionAddresses: AddressesSync,
       instructionPayload: Payload,
-      programAddress?: Pubkey,
     ): { instructionRequest: InstructionRequest } {
       const { instructionInputs } = idlInstructionAccountsEncode(
         idlInstruction,
@@ -155,7 +179,7 @@ function makeInstructionObject<AddressesAsync, AddressesSync, AddressesFull, Pay
         payloadJsonCodec.encoder(instructionPayload),
       );
       const instructionRequest = {
-        programAddress: programAddress ?? metadata.address!,
+        programAddress: metadata.address,
         instructionInputs,
         instructionData,
       };
@@ -171,4 +195,3 @@ function makeInstructionObject<AddressesAsync, AddressesSync, AddressesFull, Pay
   };
 }
 `);
-// TODO - handle unspecified program address
