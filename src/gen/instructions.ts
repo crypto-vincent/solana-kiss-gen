@@ -1,0 +1,174 @@
+import {
+  casingLosslessConvertToCamel,
+  IdlProgram,
+  IdlTypeFull,
+  idlTypeFullJsonCodecExpression,
+} from "solana-kiss";
+import {
+  utilCodeMinify,
+  utilMakeObjectString,
+  utilMapToVariableString,
+  utilToCallString,
+} from "../utils";
+
+export function genInstructions(
+  programIdl: IdlProgram,
+  lines: Array<string>,
+  dependencies: Set<string>,
+) {
+  if (programIdl.instructions.size === 0) {
+    return;
+  }
+  lines.push("");
+  utilMapToVariableString(
+    lines,
+    false,
+    symbolInstructionsPayloads,
+    programIdl.instructions,
+    (name, idl) => {
+      const typeFull = IdlTypeFull.struct({ fields: idl.args.typeFullFields });
+      const expression = idlTypeFullJsonCodecExpression(typeFull, dependencies);
+      return { key: name, value: expression };
+    },
+  );
+  lines.push("");
+  utilMapToVariableString(
+    lines,
+    false,
+    symbolInstructionsResults,
+    programIdl.instructions,
+    (name, idl) => {
+      const typeFull = idl.return.typeFull;
+      const expression = idlTypeFullJsonCodecExpression(typeFull, dependencies);
+      return { key: name, value: expression };
+    },
+  );
+  lines.push("");
+  utilMapToVariableString(
+    lines,
+    true,
+    "instructions",
+    programIdl.instructions,
+    (name, idl) => {
+      const payloadJsonCodecExpression = `${symbolInstructionsPayloads}["${name}"]`;
+      const resultJsonCodecExpression = `${symbolInstructionsResults}["${name}"]`;
+      const addressesAsyncType = utilMakeObjectString(
+        idl.accounts.map((idlInstructionAccount) => {
+          const name = casingLosslessConvertToCamel(idlInstructionAccount.name);
+          if (idlInstructionAccount.address || idlInstructionAccount.pda) {
+            return { key: name, value: "Pubkey", optional: true };
+          }
+          return { key: name, value: "Pubkey" };
+        }),
+      );
+      const addressesSyncType = utilMakeObjectString(
+        idl.accounts.map((idlInstructionAccount) => {
+          const name = casingLosslessConvertToCamel(idlInstructionAccount.name);
+          if (idlInstructionAccount.address) {
+            return { key: name, value: "Pubkey", optional: true };
+          }
+          return { key: name, value: "Pubkey" };
+        }),
+      );
+      const addressesFullType = utilMakeObjectString(
+        idl.accounts.map((idlInstructionAccount) => {
+          const name = casingLosslessConvertToCamel(idlInstructionAccount.name);
+          return { key: name, value: "Pubkey" };
+        }),
+      );
+      const payloadType = `JsonCodecContent<typeof ${payloadJsonCodecExpression}>`;
+      const resultType = `JsonCodecContent<typeof ${resultJsonCodecExpression}>`;
+      dependencies.add("JsonCodecContent");
+      return {
+        key: casingLosslessConvertToCamel(name),
+        value: utilToCallString(
+          `makeInstructionObject`,
+          [
+            addressesAsyncType,
+            addressesSyncType,
+            addressesFullType,
+            payloadType,
+            resultType,
+          ],
+          [`"${name}"`, payloadJsonCodecExpression, resultJsonCodecExpression],
+        ),
+      };
+    },
+  );
+  dependencies.add("Solana");
+  dependencies.add("Pubkey");
+  dependencies.add("JsonCodec");
+  dependencies.add("InstructionRequest");
+  dependencies.add("IdlInstructionAddresses");
+  dependencies.add("idlInstructionAccountsEncode");
+  dependencies.add("idlInstructionArgsEncode");
+  dependencies.add("idlInstructionReturnDecode");
+  lines.push("");
+  lines.push(utilFunctionInstruction);
+}
+
+const symbolInstructionsPayloads = "instructionPayloadsJsonCodecs";
+const symbolInstructionsResults = "instructionResultsJsonCodecs";
+
+const utilFunctionInstruction = utilCodeMinify(`
+function makeInstructionObject<AddressesAsync, AddressesSync, AddressesFull, Payload, Result>(
+  instructionName: string,
+  payloadJsonCodec: JsonCodec<Payload>,
+  resultJsonCodec: JsonCodec<Result>,
+) {
+  const idlInstruction = idlProgram.instructions.get(instructionName)!;
+  return {
+    async hydrateAndEncode(
+      solana: Solana,
+      instructionAddresses: AddressesAsync,
+      instructionPayload: Payload,
+      programAddress?: Pubkey,
+    ): Promise<{
+      instructionRequest: InstructionRequest;
+      instructionAddresses: AddressesFull;
+    }> {
+      const { instructionAddresses: hydratedInstructionAddresses } = await solana.hydrateInstructionAddresses(programAddress ?? metadata.address!, instructionName, {
+        instructionAddresses: instructionAddresses as IdlInstructionAddresses,
+        instructionPayload: payloadJsonCodec.encoder(instructionPayload),
+      });
+      const { instructionRequest } = await solana.hydrateAndEncodeInstruction(
+        programAddress ?? metadata.address!,
+        instructionName,
+        {
+          instructionAddresses: instructionAddresses as IdlInstructionAddresses,
+          instructionPayload: payloadJsonCodec.encoder(instructionPayload),
+        },
+      );
+      return { instructionRequest, instructionAddresses: hydratedInstructionAddresses as AddressesFull };
+    },
+    encode(
+      instructionAddresses: AddressesSync,
+      instructionPayload: Payload,
+      programAddress?: Pubkey,
+    ): { instructionRequest: InstructionRequest } {
+      const { instructionInputs } = idlInstructionAccountsEncode(
+        idlInstruction,
+        instructionAddresses as IdlInstructionAddresses,
+      );
+      const { instructionData } = idlInstructionArgsEncode(
+        idlInstruction,
+        payloadJsonCodec.encoder(instructionPayload),
+      );
+      const instructionRequest = {
+        programAddress: programAddress ?? metadata.address!,
+        instructionInputs,
+        instructionData,
+      };
+      return { instructionRequest };
+    },
+    decodeReturn(instructionReturned: Uint8Array) {
+      const { instructionResult } = idlInstructionReturnDecode(
+        idlInstruction,
+        instructionReturned,
+      );
+      return { instructionResult: resultJsonCodec.decoder(instructionResult) };
+    },
+  };
+}
+`);
+// TODO - handle unspecified program address
