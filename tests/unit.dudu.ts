@@ -11,13 +11,28 @@ import programAta from "./fixtures/ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
 import programToken from "./fixtures/TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
 it("run", async () => {
-  const ata = programAta.pdas.ata.find({
-    owner: pubkeyFromBase58("5UwX1EZUtFDo6wmwqQGxwYprQmraAxMEAwTocu5W5Ve8"),
-    mint: pubkeyFromBase58("76wX8tHAzuqucfwNfgzxugumab6cwPL5ZGdHWi8vhL8s"),
-  });
-  expect(ata).toBe("G1hZxxBdb9sM1eQMVZCpe81PFvH4SyFK83Ue3wNrMUzr");
-
   const solana = new Solana("devnet");
+
+  const ataOwner = pubkeyFromBase58(
+    "5UwX1EZUtFDo6wmwqQGxwYprQmraAxMEAwTocu5W5Ve8",
+  );
+  const ataMint = pubkeyFromBase58(
+    "76wX8tHAzuqucfwNfgzxugumab6cwPL5ZGdHWi8vhL8s",
+  );
+
+  const ataAddress = programAta.pdas.ata.find({
+    owner: ataOwner,
+    mint: ataMint,
+  });
+  expect(ataAddress).toBe("G1hZxxBdb9sM1eQMVZCpe81PFvH4SyFK83Ue3wNrMUzr");
+
+  const ataFetch = await programToken.accounts.TokenAccount.fetch(
+    solana.getRpcHttp(),
+    ataAddress,
+  );
+  expect(ataFetch.accountState.mint).toStrictEqual(ataMint);
+  expect(ataFetch.accountState.owner).toStrictEqual(ataOwner);
+
   const payerSigner = await signerFromSecret(payerSecret);
   const mintSigner = await signerGenerate();
 
@@ -39,16 +54,24 @@ it("run", async () => {
         freezeAuthority: payerSigner.address,
       },
     );
-  expect(
-    initializeMint.instructionRequest.instructionData.length,
-  ).toStrictEqual(67);
-
   const results = await solana.prepareAndExecuteTransaction(
     payerSigner,
     [create.instructionRequest, initializeMint.instructionRequest],
-    { extraSigners: [mintSigner], skipPreflight: true },
+    { extraSigners: [mintSigner] },
   );
   expect(results.executionReport.transactionError).toStrictEqual(null);
+
+  const mintFetch = await programToken.accounts.TokenMint.fetch(
+    solana.getRpcHttp(),
+    mintSigner.address,
+  );
+  expect(mintFetch.accountState.decimals).toStrictEqual(6);
+  expect(mintFetch.accountState.mintAuthority).toStrictEqual(
+    payerSigner.address,
+  );
+  expect(mintFetch.accountState.freezeAuthority).toStrictEqual(
+    payerSigner.address,
+  );
 });
 
 const payerSecret = new Uint8Array([

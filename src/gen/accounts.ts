@@ -42,6 +42,9 @@ export function genAccounts(
     };
   });
   dependencies.add("JsonCodec");
+  dependencies.add("RpcHttp");
+  dependencies.add("rpcHttpGetAccountWithData");
+  dependencies.add("Pubkey");
   dependencies.add("idlAccountDecode");
   lines.push("");
   lines.push(makeFunction);
@@ -56,11 +59,19 @@ function makeAccountObject<State>(
 ) {
   const idlAccount = idlProgram.accounts.get(accountName)!;
   return {
-    decode(accountData: Uint8Array) {
-      const accountState = stateJsonCodec.decoder(
-        idlAccountDecode(idlAccount, accountData),
+  return {
+    async fetch(rpcHttp: RpcHttp, accountAddress: Pubkey) {
+      const results = await rpcHttpGetAccountWithData(rpcHttp, accountAddress);
+      console.log(idlAccountDecode(idlAccount, results.accountData));
+      const { accountState } = idlAccountDecode(
+        idlAccount,
+        results.accountData,
       );
-      return { accountState };
+      return { ...results, accountState: stateJsonCodec.decoder(accountState) };
+    },
+    decode(accountData: Uint8Array) {
+      const { accountState } = idlAccountDecode(idlAccount, accountData);
+      return { accountState: stateJsonCodec.decoder(accountState) };
     },
   };
 }

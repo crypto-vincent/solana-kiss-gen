@@ -54,7 +54,11 @@ export function genInstructions(
       const addrAsyncType = utilMakeObjectString(
         idl.accounts.map((idlInstructionAccount) => {
           const name = casingLosslessConvertToCamel(idlInstructionAccount.name);
-          if (idlInstructionAccount.address || idlInstructionAccount.pda) {
+          if (
+            idlInstructionAccount.address ||
+            idlInstructionAccount.pda ||
+            idlInstructionAccount.optional
+          ) {
             return { key: name, value: "Pubkey", optional: true };
           }
           return { key: name, value: "Pubkey" };
@@ -63,7 +67,7 @@ export function genInstructions(
       const addrSyncType = utilMakeObjectString(
         idl.accounts.map((idlInstructionAccount) => {
           const name = casingLosslessConvertToCamel(idlInstructionAccount.name);
-          if (idlInstructionAccount.address) {
+          if (idlInstructionAccount.address || idlInstructionAccount.optional) {
             return { key: name, value: "Pubkey", optional: true };
           }
           return { key: name, value: "Pubkey" };
