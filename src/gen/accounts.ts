@@ -15,12 +15,13 @@ export function genAccounts(
   dependencies: Set<string>,
 ) {
   if (programIdl.accounts.size === 0) {
+    lines.push("");
+    lines.push("const accounts = {};");
     return;
   }
   lines.push("");
   utilMapToVariableString(
     lines,
-    false,
     symbolAccounts,
     programIdl.accounts,
     (name, idl) => {
@@ -30,22 +31,16 @@ export function genAccounts(
     },
   );
   lines.push("");
-  utilMapToVariableString(
-    lines,
-    true,
-    "accounts",
-    programIdl.accounts,
-    (name) => {
-      return {
-        key: casingLosslessConvertToCamel(name),
-        value: utilToCallString(
-          `makeAccountObject`,
-          [],
-          [`"${name}"`, `${symbolAccounts}["${name}"]`],
-        ),
-      };
-    },
-  );
+  utilMapToVariableString(lines, "accounts", programIdl.accounts, (name) => {
+    return {
+      key: casingLosslessConvertToCamel(name),
+      value: utilToCallString(
+        `makeAccountObject`,
+        [],
+        [`"${name}"`, `${symbolAccounts}["${name}"]`],
+      ),
+    };
+  });
   dependencies.add("JsonCodec");
   dependencies.add("idlAccountDecode");
   lines.push("");

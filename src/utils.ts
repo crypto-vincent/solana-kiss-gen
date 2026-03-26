@@ -1,11 +1,4 @@
-export function utilMakeVariableString(
-  exported: boolean,
-  name: string,
-  value: string,
-) {
-  if (exported) {
-    return `export const ${name} = ${value};`;
-  }
+export function utilMakeVariableString(name: string, value: string) {
   return `const ${name} = ${value};`;
 }
 
@@ -13,16 +6,23 @@ export function utilMakeObjectString(
   entries: Array<{ key: string; value: string; optional?: boolean }>,
   space?: number,
 ): string {
+  entries.sort((a, b) => (a.optional ? 1 : 0) - (b.optional ? 1 : 0));
   const parts = new Array<string>();
+  let first = true;
   parts.push("{");
   for (const { key, value, optional } of entries) {
+    if (first) {
+      first = false;
+    } else {
+      parts.push(",");
+    }
     if (space !== undefined) {
       parts.push(`\n${" ".repeat(space)}`);
     }
     if (optional) {
-      parts.push(`"${key}"?:${value} | undefined,`);
+      parts.push(`"${key}"?:${value}|undefined`);
     } else {
-      parts.push(`"${key}":${value},`);
+      parts.push(`"${key}":${value}`);
     }
   }
   if (space !== undefined) {
@@ -45,7 +45,6 @@ export function utilMapToArray<K, V, Out>(
 
 export function utilMapToVariableString<K, V>(
   lines: Array<string>,
-  exported: boolean,
   name: string,
   map: Map<K, V>,
   mapper: (
@@ -55,7 +54,7 @@ export function utilMapToVariableString<K, V>(
 ) {
   const entries = utilMapToArray(map, mapper);
   const objectString = utilMakeObjectString(entries, 2);
-  const variableString = utilMakeVariableString(exported, name, objectString);
+  const variableString = utilMakeVariableString(name, objectString);
   lines.push(variableString);
 }
 

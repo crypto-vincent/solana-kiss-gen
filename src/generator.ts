@@ -19,6 +19,8 @@ export function makeIdlModule(
   genInstructions(programIdl, lines, dependencies);
   genAccounts(programIdl, lines, dependencies);
   genPdas(programIdl, lines, dependencies);
+  lines.push("");
+  lines.push("export default { metadata, instructions, accounts, pdas };");
   lines.unshift(`import {${[...dependencies].join(",")}} from "solana-kiss";`);
   return lines.join("\n");
 }

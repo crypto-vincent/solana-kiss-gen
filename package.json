@@ -6,7 +6,7 @@
   },
   "dependencies": {
     "cli-kiss": "0.2.3",
-    "solana-kiss": "0.2.21"
+    "solana-kiss": "0.2.22"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",

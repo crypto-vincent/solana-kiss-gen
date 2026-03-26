@@ -34,10 +34,6 @@ export function genMetadata(
   });
   lines.push("");
   lines.push(
-    utilMakeVariableString(
-      true,
-      "metadata",
-      utilMakeObjectString(metadatas, 2),
-    ),
+    utilMakeVariableString("metadata", utilMakeObjectString(metadatas, 2)),
   );
 }

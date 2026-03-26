@@ -17,12 +17,13 @@ export function genInstructions(
   dependencies: Set<string>,
 ) {
   if (programIdl.instructions.size === 0) {
+    lines.push("");
+    lines.push("const instructions = {};");
     return;
   }
   lines.push("");
   utilMapToVariableString(
     lines,
-    false,
     symbolInstructionsPayloads,
     programIdl.instructions,
     (name, idl) => {
@@ -34,7 +35,6 @@ export function genInstructions(
   lines.push("");
   utilMapToVariableString(
     lines,
-    false,
     symbolInstructionsResults,
     programIdl.instructions,
     (name, idl) => {
@@ -46,13 +46,12 @@ export function genInstructions(
   lines.push("");
   utilMapToVariableString(
     lines,
-    true,
     "instructions",
     programIdl.instructions,
     (name, idl) => {
       const payloadJsonCodecExpression = `${symbolInstructionsPayloads}["${name}"]`;
       const resultJsonCodecExpression = `${symbolInstructionsResults}["${name}"]`;
-      const addressesAsyncType = utilMakeObjectString(
+      const addrAsyncType = utilMakeObjectString(
         idl.accounts.map((idlInstructionAccount) => {
           const name = casingLosslessConvertToCamel(idlInstructionAccount.name);
           if (idlInstructionAccount.address || idlInstructionAccount.pda) {
@@ -61,7 +60,7 @@ export function genInstructions(
           return { key: name, value: "Pubkey" };
         }),
       );
-      const addressesSyncType = utilMakeObjectString(
+      const addrSyncType = utilMakeObjectString(
         idl.accounts.map((idlInstructionAccount) => {
           const name = casingLosslessConvertToCamel(idlInstructionAccount.name);
           if (idlInstructionAccount.address) {
@@ -70,7 +69,7 @@ export function genInstructions(
           return { key: name, value: "Pubkey" };
         }),
       );
-      const addressesFullType = utilMakeObjectString(
+      const addrFullType = utilMakeObjectString(
         idl.accounts.map((idlInstructionAccount) => {
           const name = casingLosslessConvertToCamel(idlInstructionAccount.name);
           return { key: name, value: "Pubkey" };
@@ -83,13 +82,7 @@ export function genInstructions(
         key: casingLosslessConvertToCamel(name),
         value: utilToCallString(
           `makeInstructionObject`,
-          [
-            addressesAsyncType,
-            addressesSyncType,
-            addressesFullType,
-            payloadType,
-            resultType,
-          ],
+          [addrAsyncType, addrSyncType, addrFullType, payloadType, resultType],
           [`"${name}"`, payloadJsonCodecExpression, resultJsonCodecExpression],
         ),
       };

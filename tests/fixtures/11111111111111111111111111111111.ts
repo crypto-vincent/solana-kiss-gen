@@ -1,8 +1,10 @@
 import {
   idlAccountDecode,
   idlInstructionAccountsEncode,
+  idlInstructionAccountsFind,
   IdlInstructionAddresses,
   idlInstructionArgsEncode,
+  IdlInstructionBlobAccountContent,
   idlInstructionReturnDecode,
   idlProgramParse,
   InstructionRequest,
@@ -56,9 +58,9 @@ const idlProgram = idlProgramParse({
   errors: {},
 });
 
-export const metadata = {
-  name: "system",
+const metadata = {
   address: pubkeyFromBase58("11111111111111111111111111111111"),
+  name: "system",
   source: new URL(
     "https://raw.githubusercontent.com/crypto-vincent/solana-idls/refs/heads/main/data/11111111111111111111111111111111.json",
   ),
@@ -83,7 +85,7 @@ const instructionResultsJsonCodecs = {
   allocate: jsonCodecConst(null),
 };
 
-export const instructions = {
+const instructions = {
   create: makeInstructionObject<
     { payer: Pubkey; created: Pubkey },
     { payer: Pubkey; created: Pubkey },
@@ -147,38 +149,51 @@ function makeInstructionObject<
       solana: Solana,
       instructionAddresses: AddressesAsync,
       instructionPayload: Payload,
-      programAddress?: Pubkey,
     ): Promise<{
       instructionRequest: InstructionRequest;
       instructionAddresses: AddressesFull;
     }> {
+      const encodedPayload = payloadJsonCodec.encoder(instructionPayload);
+      const accountsCache = new Map<Pubkey, IdlInstructionBlobAccountContent>();
       const { instructionAddresses: hydratedInstructionAddresses } =
-        await solana.hydrateInstructionAddresses(
-          programAddress ?? metadata.address,
-          instructionName,
-          {
-            instructionAddresses:
-              instructionAddresses as IdlInstructionAddresses,
-            instructionPayload: payloadJsonCodec.encoder(instructionPayload),
-          },
-        );
-      const { instructionRequest } = await solana.hydrateAndEncodeInstruction(
-        programAddress ?? metadata.address,
-        instructionName,
-        {
+        await idlInstructionAccountsFind(idlInstruction, metadata.address, {
           instructionAddresses: instructionAddresses as IdlInstructionAddresses,
-          instructionPayload: payloadJsonCodec.encoder(instructionPayload),
-        },
+          instructionPayload: encodedPayload,
+          accountFetcher: async (accountAddress: Pubkey) => {
+            const accountCached = accountsCache.get(accountAddress);
+            if (accountCached) {
+              return accountCached;
+            }
+            const { accountIdl, accountState } =
+              await solana.getAndInferAndDecodeAccount(accountAddress);
+            const accountContent = {
+              accountState,
+              accountTypeFull: accountIdl.typeFull,
+            };
+            accountsCache.set(accountAddress, accountContent);
+            return accountContent;
+          },
+        });
+      const { instructionInputs } = idlInstructionAccountsEncode(
+        idlInstruction,
+        hydratedInstructionAddresses,
+      );
+      const { instructionData } = idlInstructionArgsEncode(
+        idlInstruction,
+        encodedPayload,
       );
       return {
-        instructionRequest,
+        instructionRequest: {
+          programAddress: metadata.address,
+          instructionInputs,
+          instructionData,
+        },
         instructionAddresses: hydratedInstructionAddresses as AddressesFull,
       };
     },
     encode(
       instructionAddresses: AddressesSync,
       instructionPayload: Payload,
-      programAddress?: Pubkey,
     ): { instructionRequest: InstructionRequest } {
       const { instructionInputs } = idlInstructionAccountsEncode(
         idlInstruction,
@@ -189,7 +204,7 @@ function makeInstructionObject<
         payloadJsonCodec.encoder(instructionPayload),
       );
       const instructionRequest = {
-        programAddress: programAddress ?? metadata.address,
+        programAddress: metadata.address,
         instructionInputs,
         instructionData,
       };
@@ -205,12 +220,12 @@ function makeInstructionObject<
   };
 }
 
-const accountsJsonCodec = {
+const accountsJsonCodecs = {
   Account: jsonCodecConst(null),
 };
 
-export const accounts = {
-  Account: makeAccountObject("Account", accountsJsonCodec["Account"]),
+const accounts = {
+  Account: makeAccountObject("Account", accountsJsonCodecs["Account"]),
 };
 
 function makeAccountObject<State>(
@@ -227,3 +242,7 @@ function makeAccountObject<State>(
     },
   };
 }
+
+const pdas = {};
+
+export default { metadata, instructions, accounts, pdas };

@@ -1,5 +1,4 @@
 import { expect, it } from "@jest/globals";
-
 import {
   lamportsRentExemptionMinimumForSpace,
   pubkeyFromBase58,
@@ -7,23 +6,22 @@ import {
   signerGenerate,
   Solana,
 } from "solana-kiss";
-import * as programSystem from "./fixtures/11111111111111111111111111111111";
-import * as programAta from "./fixtures/ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
-import * as programToken from "./fixtures/TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+import programSystem from "./fixtures/11111111111111111111111111111111";
+import programAta from "./fixtures/ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
+import programToken from "./fixtures/TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
 it("run", async () => {
-  const dudu = programAta.pdas.ata.find({
+  const ata = programAta.pdas.ata.find({
     owner: pubkeyFromBase58("5UwX1EZUtFDo6wmwqQGxwYprQmraAxMEAwTocu5W5Ve8"),
-    tokenProgram: programToken.metadata.address,
     mint: pubkeyFromBase58("76wX8tHAzuqucfwNfgzxugumab6cwPL5ZGdHWi8vhL8s"),
   });
-  expect(dudu).toBe("G1hZxxBdb9sM1eQMVZCpe81PFvH4SyFK83Ue3wNrMUzr");
+  expect(ata).toBe("G1hZxxBdb9sM1eQMVZCpe81PFvH4SyFK83Ue3wNrMUzr");
 
   const solana = new Solana("devnet");
   const payerSigner = await signerFromSecret(payerSecret);
   const mintSigner = await signerGenerate();
 
-  const dodo = programSystem.instructions.create.encode(
+  const create = programSystem.instructions.create.encode(
     { payer: payerSigner.address, created: mintSigner.address },
     {
       lamports: lamportsRentExemptionMinimumForSpace(82),
@@ -31,20 +29,23 @@ it("run", async () => {
       owner: programToken.metadata.address,
     },
   );
-  const dada = await programToken.instructions.initializeMint.hydrateAndEncode(
-    solana,
-    { mint: mintSigner.address },
-    {
-      decimals: 6,
-      mintAuthority: payerSigner.address,
-      freezeAuthority: payerSigner.address,
-    },
-  );
-  expect(dada.instructionRequest.instructionData.length).toStrictEqual(67);
+  const initializeMint =
+    await programToken.instructions.initializeMint.hydrateAndEncode(
+      solana,
+      { mint: mintSigner.address },
+      {
+        decimals: 6,
+        mintAuthority: payerSigner.address,
+        freezeAuthority: payerSigner.address,
+      },
+    );
+  expect(
+    initializeMint.instructionRequest.instructionData.length,
+  ).toStrictEqual(67);
 
   const results = await solana.prepareAndExecuteTransaction(
     payerSigner,
-    [dodo.instructionRequest, dada.instructionRequest],
+    [create.instructionRequest, initializeMint.instructionRequest],
     { extraSigners: [mintSigner], skipPreflight: true },
   );
   expect(results.executionReport.transactionError).toStrictEqual(null);

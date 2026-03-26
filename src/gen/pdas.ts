@@ -1,14 +1,15 @@
 import {
   casingLosslessConvertToCamel,
+  IdlPda,
+  IdlPdaBlobConst,
   IdlPdaBlobInput,
   IdlProgram,
-  IdlTypeFull,
-  IdlTypeFullFieldNamed,
-  IdlTypeFullFields,
   idlTypeFullJsonCodecExpression,
+  idlTypeFullJsonCodecTyping,
 } from "solana-kiss";
 import {
   utilCodeMinify,
+  utilMakeObjectString,
   utilMapToVariableString,
   utilToCallString,
 } from "../utils";
@@ -19,39 +20,30 @@ export function genPdas(
   dependencies: Set<string>,
 ) {
   if (programIdl.pdas.size === 0) {
+    lines.push("");
+    lines.push("const pdas = {};");
     return;
   }
   lines.push("");
-  utilMapToVariableString(
-    lines,
-    false,
-    symbolPdasInputs,
-    programIdl.pdas,
-    (name, idl) => {
-      const fields = new Array<IdlTypeFullFieldNamed>();
-      for (const blob of idl.seeds) {
-        blob.traverse(pdaBlobVisitor, fields, undefined);
-      }
-      if (idl.program) {
-        idl.program.traverse(pdaBlobVisitor, fields, undefined);
-      }
-      const typeFullFields = IdlTypeFullFields.named(fields);
-      const typeFull = IdlTypeFull.struct({ fields: typeFullFields });
-      const expression = idlTypeFullJsonCodecExpression(typeFull, dependencies);
-      return { key: name, value: expression };
-    },
-  );
-  lines.push("");
-  utilMapToVariableString(lines, true, "pdas", programIdl.pdas, (name) => {
-    const inputsJsonCodecExpression = `${symbolPdasInputs}["${name}"]`;
-    const inputsType = `JsonCodecContent<typeof ${inputsJsonCodecExpression}>`;
-    dependencies.add("JsonCodecContent");
+  utilMapToVariableString(lines, "pdas", programIdl.pdas, (name, idl) => {
+    const expressions = new Array<{
+      key: string;
+      value: string;
+      optional?: boolean;
+    }>();
+    const typings = new Array<{
+      key: string;
+      value: string;
+      optional?: boolean;
+    }>();
+    pdaBlobsVisit(idl, expressions, dependencies, visitorExpression);
+    pdaBlobsVisit(idl, typings, dependencies, visitorTyping);
     return {
       key: casingLosslessConvertToCamel(name),
       value: utilToCallString(
         `makePdaObject`,
-        [inputsType],
-        [`"${name}"`, `${inputsJsonCodecExpression}`],
+        [utilMakeObjectString(typings)],
+        [`"${name}"`, utilMakeObjectString(expressions)],
       ),
     };
   });
@@ -63,29 +55,71 @@ export function genPdas(
   lines.push(makePda);
 }
 
-const symbolPdasInputs = "pdasInputsJsonCodecs";
+function pdaBlobsVisit<P1, P2>(
+  self: IdlPda,
+  p1: P1,
+  p2: P2,
+  visitor: {
+    const: (self: IdlPdaBlobConst, p1: P1, p2: P2) => void;
+    input: (self: IdlPdaBlobInput, p1: P1, p2: P2) => void;
+  },
+) {
+  for (const blob of self.seeds) {
+    blob.traverse(visitor, p1, p2);
+  }
+  if (self.program) {
+    self.program.traverse(visitor, p1, p2);
+  }
+}
 
-const pdaBlobVisitor = {
+const visitorExpression = {
   const: () => {},
-  input: (value: IdlPdaBlobInput, fields: Array<IdlTypeFullFieldNamed>) => {
-    fields.push({
-      name: casingLosslessConvertToCamel(value.name),
-      content: value.typeFull,
+  input: (
+    self: IdlPdaBlobInput,
+    expressions: Array<{ key: string; value: string; optional?: boolean }>,
+    dependencies: Set<string>,
+  ) => {
+    expressions.push({
+      key: casingLosslessConvertToCamel(self.name),
+      value: idlTypeFullJsonCodecExpression(self.typeFull, dependencies),
+    });
+  },
+};
+
+const visitorTyping = {
+  const: () => {},
+  input: (
+    self: IdlPdaBlobInput,
+    typings: Array<{ key: string; value: string; optional?: boolean }>,
+    dependencies: Set<string>,
+  ) => {
+    typings.push({
+      key: casingLosslessConvertToCamel(self.name),
+      value: idlTypeFullJsonCodecTyping(self.typeFull, dependencies),
+      optional: self.value !== null,
     });
   },
 };
 
 const makePda = utilCodeMinify(`
-function makePdaObject<Inputs>(
+function makePdaObject<Inputs extends Record<string, any>>(
   pdaName: string,
-  inputsJsonCodec: JsonCodec<Inputs>,
+  inputsJsonCodecs: Record<string, JsonCodec<any>>,
 ) {
   const idlPda = idlProgram.pdas.get(pdaName)!;
   return {
     find(inputs: Inputs, programAddress?: Pubkey): Pubkey {
+      const inputsValues: Record<string, JsonValue> = {};
+      for (const inputKey in inputsJsonCodecs) {
+        if (inputs[inputKey] !== undefined) {
+          inputsValues[inputKey] = inputsJsonCodecs[inputKey]!.encoder(
+            inputs[inputKey],
+          );
+        }
+      }
       return idlPdaFind(
         idlPda,
-        inputsJsonCodec.encoder(inputs) as Record<string, JsonValue>,
+        inputsValues,
         programAddress ?? metadata.address,
       );
     },
