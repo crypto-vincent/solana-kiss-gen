@@ -59,10 +59,8 @@ function makeAccountObject<State>(
 ) {
   const idlAccount = idlProgram.accounts.get(accountName)!;
   return {
-  return {
     async fetch(rpcHttp: RpcHttp, accountAddress: Pubkey) {
       const results = await rpcHttpGetAccountWithData(rpcHttp, accountAddress);
-      console.log(idlAccountDecode(idlAccount, results.accountData));
       const { accountState } = idlAccountDecode(
         idlAccount,
         results.accountData,

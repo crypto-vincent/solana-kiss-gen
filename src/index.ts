@@ -23,14 +23,14 @@ const typePubkey: Type<Pubkey> = {
   decoder: pubkeyFromBase58,
 };
 
-const idlFilePathCommand = command(
-  { description: "Generate by ?" },
+const idlFileCommand = command(
+  { description: "Generate a typescript module from an IDL file" },
   operation(
     {
       options: {},
       positionals: [
         positionalRequired({
-          description: "?",
+          description: "Path to the IDL file",
           label: "IDL_FILE_PATH",
           type: typeString,
         }),
@@ -50,8 +50,11 @@ const idlFilePathCommand = command(
   ),
 );
 
-const programAddressCommand = command(
-  { description: "Generate by fetching IDL by program address" },
+const fetchIdlCommand = command(
+  {
+    description:
+      "Generate a typescript module by fetching an existing onchain IDL",
+  },
   operation(
     {
       options: {
@@ -81,13 +84,18 @@ const programAddressCommand = command(
 );
 
 const rootCommand = commandWithSubcommands(
-  { description: "TODO" },
-  operation({ options: {}, positionals: [] }, async () => {
-    return undefined;
-  }),
   {
-    "by-program-address": programAddressCommand,
-    "by-idl-file-path": idlFilePathCommand,
+    description: "IDL to Typescript module generator",
+    details: [
+      "Generate a typescript module from an IDL.",
+      "Access typed accounts, instructions and PDAs.",
+      "The generated code will be usable with the solana-kiss library.",
+    ],
+  },
+  operation({ options: {}, positionals: [] }, async () => {}),
+  {
+    "fetch-idl": fetchIdlCommand,
+    "idl-file": idlFileCommand,
   },
 );
 

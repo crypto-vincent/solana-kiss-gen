@@ -54,6 +54,7 @@ it("run", async () => {
         freezeAuthority: payerSigner.address,
       },
     );
+
   const results = await solana.prepareAndExecuteTransaction(
     payerSigner,
     [create.instructionRequest, initializeMint.instructionRequest],
@@ -72,6 +73,20 @@ it("run", async () => {
   expect(mintFetch.accountState.freezeAuthority).toStrictEqual(
     payerSigner.address,
   );
+
+  const initializeMintRedecoded =
+    programToken.instructions.initializeMint.decode(
+      initializeMint.instructionRequest,
+    );
+  expect(initializeMintRedecoded.instructionAddresses).toStrictEqual({
+    mint: mintSigner.address,
+    rent: pubkeyFromBase58("SysvarRent111111111111111111111111111111111"),
+  });
+  expect(initializeMintRedecoded.instructionPayload).toStrictEqual({
+    decimals: 6,
+    mintAuthority: payerSigner.address,
+    freezeAuthority: payerSigner.address,
+  });
 });
 
 const payerSecret = new Uint8Array([

@@ -76,6 +76,9 @@ export function genInstructions(
       const addrFullType = utilMakeObjectString(
         idl.accounts.map((idlInstructionAccount) => {
           const name = casingLosslessConvertToCamel(idlInstructionAccount.name);
+          if (idlInstructionAccount.optional) {
+            return { key: name, value: "Pubkey", optional: true };
+          }
           return { key: name, value: "Pubkey" };
         }),
       );
@@ -99,9 +102,11 @@ export function genInstructions(
   dependencies.add("IdlInstructionAddresses");
   dependencies.add("IdlInstructionBlobAccountContent");
   dependencies.add("idlInstructionAccountsEncode");
-  dependencies.add("idlInstructionArgsEncode");
-  dependencies.add("idlInstructionReturnDecode");
+  dependencies.add("idlInstructionAccountsDecode");
   dependencies.add("idlInstructionAccountsFind");
+  dependencies.add("idlInstructionArgsEncode");
+  dependencies.add("idlInstructionArgsDecode");
+  dependencies.add("idlInstructionReturnDecode");
   lines.push("");
   lines.push(utilFunctionInstruction);
 }
@@ -182,7 +187,21 @@ function makeInstructionObject<AddressesAsync, AddressesSync, AddressesFull, Pay
       };
       return { instructionRequest };
     },
-    decodeReturn(instructionReturned: Uint8Array) {
+    decode(instructionRequest: InstructionRequest) {
+      const { instructionAddresses } = idlInstructionAccountsDecode(
+        idlInstruction,
+        instructionRequest.instructionInputs,
+      );
+      const { instructionPayload } = idlInstructionArgsDecode(
+        idlInstruction,
+        instructionRequest.instructionData,
+      );
+      return {
+        instructionAddresses: instructionAddresses as AddressesFull,
+        instructionPayload: payloadJsonCodec.decoder(instructionPayload),
+      };
+    },
+    getResult(instructionReturned: Uint8Array) {
       const { instructionResult } = idlInstructionReturnDecode(
         idlInstruction,
         instructionReturned,
