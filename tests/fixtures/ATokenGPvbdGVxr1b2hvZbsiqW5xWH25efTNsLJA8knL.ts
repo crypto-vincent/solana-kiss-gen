@@ -1,7 +1,9 @@
 import {
+  idlInstructionAccountsDecode,
   idlInstructionAccountsEncode,
   idlInstructionAccountsFind,
   IdlInstructionAddresses,
+  idlInstructionArgsDecode,
   idlInstructionArgsEncode,
   IdlInstructionBlobAccountContent,
   idlInstructionReturnDecode,
@@ -256,7 +258,21 @@ function makeInstructionObject<
       };
       return { instructionRequest };
     },
-    decodeReturn(instructionReturned: Uint8Array) {
+    decode(instructionRequest: InstructionRequest) {
+      const { instructionAddresses } = idlInstructionAccountsDecode(
+        idlInstruction,
+        instructionRequest.instructionInputs,
+      );
+      const { instructionPayload } = idlInstructionArgsDecode(
+        idlInstruction,
+        instructionRequest.instructionData,
+      );
+      return {
+        instructionAddresses: instructionAddresses as AddressesFull,
+        instructionPayload: payloadJsonCodec.decoder(instructionPayload),
+      };
+    },
+    getResult(instructionReturned: Uint8Array) {
       const { instructionResult } = idlInstructionReturnDecode(
         idlInstruction,
         instructionReturned,

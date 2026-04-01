@@ -6,7 +6,8 @@ import {
   positionalRequired,
   runAndExit,
   Type,
-  typeString,
+  typePath,
+  typeRenamed,
 } from "cli-kiss";
 import { promises as fsp } from "node:fs";
 import {
@@ -15,7 +16,10 @@ import {
   Pubkey,
   pubkeyFromBase58,
   Solana,
+  urlRpcFromUrlOrMoniker,
+  urlRpcPublicMainnet,
 } from "solana-kiss";
+import { version } from "../package.json";
 import { makeIdlModule } from "./generator";
 
 const typePubkey: Type<Pubkey> = {
@@ -31,13 +35,11 @@ const idlFileCommand = command(
       positionals: [
         positionalRequired({
           description: "Path to the IDL file",
-          label: "IDL_FILE_PATH",
-          type: typeString,
+          type: typePath("idl-file-path", { checkSyncExistAs: "file" }),
         }),
         positionalRequired({
-          description: "Program address",
-          label: "PROGRAM_ADDRESS",
-          type: typePubkey,
+          description: "Program address (Program Id)",
+          type: typeRenamed(typePubkey, "program-address"),
         }),
       ],
     },
@@ -61,16 +63,17 @@ const fetchIdlCommand = command(
         rpcUrl: optionSingleValue({
           description: "Solana RPC URL or moniker",
           long: "rpc",
-          label: "RPC_URL_OR_MONIKER",
-          type: typeString,
-          default: () => "mainnet",
+          type: {
+            content: "url-or-moniker",
+            decoder: urlRpcFromUrlOrMoniker,
+          },
+          defaultWhenNotDefined: () => urlRpcPublicMainnet,
         }),
       },
       positionals: [
         positionalRequired({
-          description: "Program address",
-          label: "PROGRAM_ADDRESS",
-          type: typePubkey,
+          description: "Program address (Program Id)",
+          type: typeRenamed(typePubkey, "program-address"),
         }),
       ],
     },
@@ -100,5 +103,5 @@ const rootCommand = commandWithSubcommands(
 );
 
 runAndExit("solana-kiss-gen", process.argv.slice(2), undefined, rootCommand, {
-  buildVersion: process.env["NPM_PACKAGE_VERSION"] ?? "0.0.1",
+  buildVersion: version,
 });
