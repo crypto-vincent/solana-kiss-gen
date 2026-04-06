@@ -5,7 +5,7 @@
     "solana-kiss-gen": "./dist/index.js"
   },
   "dependencies": {
-    "cli-kiss": "0.2.5",
+    "cli-kiss": "0.2.7",
     "solana-kiss": "0.2.22"
   },
   "devDependencies": {
